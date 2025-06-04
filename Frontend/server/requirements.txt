@@ -1,0 +1,10 @@
+flask==3.0.2
+flask-cors==4.0.0
+opencv-python==4.9.0.80
+pytesseract==0.3.10
+pydub==0.25.1
+openai-whisper==20231117
+PyMuPDF==1.23.8
+numpy==1.24.3
+sumy==0.11.0
+Werkzeug>=3.0.0 

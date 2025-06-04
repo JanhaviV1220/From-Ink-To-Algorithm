@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Extraction Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .container { max-width: 800px; margin-top: 50px; }
+        .card { margin-bottom: 20px; }
+        .hidden { display: none; }
+        .result-item { margin-bottom: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 4px; }
+        .file-name { font-weight: bold; color: #0d6efd; }
+        .spinner-border { width: 1rem; height: 1rem; margin-right: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">Text Extraction Tool</h1>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5>Extract Text</h5>
+            </div>
+            <div class="card-body">
+                <form id="extractForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="fileType" class="form-label">File Type</label>
+                        <select class="form-select" id="fileType" name="type" required>
+                            <option value="">Select file type</option>
+                            <option value="image">Image</option>
+                            <option value="audio">Audio</option>
+                            <option value="pdf">PDF</option>
+                            <option value="handwritten">Handwritten</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Upload File</label>
+                        <input type="file" class="form-control" id="file" name="file" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="extractBtn">
+                        Extract Text
+                    </button>
+                </form>
+                <div id="extractResult" class="mt-3 hidden">
+                    <h6>Extracted Text:</h6>
+                    <div class="border p-3" id="extractedText"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5>Search Database</h5>
+            </div>
+            <div class="card-body">
+                <form id="searchForm">
+                    <div class="mb-3">
+                        <label for="searchText" class="form-label">Search Text</label>
+                        <input type="text" class="form-control" id="searchText" name="text" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="searchBtn">
+                        Search
+                    </button>
+                </form>
+                <div id="searchResult" class="mt-3 hidden">
+                    <h6>Search Results:</h6>
+                    <div id="searchResults"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5>Text Summarization</h5>
+            </div>
+            <div class="card-body">
+                <form id="summarizeForm">
+                    <div class="mb-3">
+                        <label for="summarizeText" class="form-label">Text to Summarize</label>
+                        <textarea class="form-control" id="summarizeText" name="text" rows="4" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="sentenceCount" class="form-label">Number of Sentences</label>
+                        <input type="number" class="form-control" id="sentenceCount" name="sentence_count" value="5" min="1" max="20">
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="summarizeBtn">
+                        Summarize
+                    </button>
+                </form>
+                <div id="summarizeResult" class="mt-3 hidden">
+                    <h6>Summary:</h6>
+                    <div class="border p-3" id="summaryText"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const forms = {
+                extract: document.getElementById('extractForm'),
+                search: document.getElementById('searchForm'),
+                summarize: document.getElementById('summarizeForm')
+            };
+
+            const buttons = {
+                extract: document.getElementById('extractBtn'),
+                search: document.getElementById('searchBtn'),
+                summarize: document.getElementById('summarizeBtn')
+            };
+
+            function showLoading(button) {
+                const originalText = button.innerHTML;
+                button.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...`;
+                button.disabled = true;
+                return originalText;
+            }
+
+            function hideLoading(button, originalText) {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+
+            function displaySearchResults(results) {
+                const container = document.getElementById('searchResults');
+                container.innerHTML = '';
+                
+                if (results.length === 0) {
+                    container.innerHTML = '<div class="alert alert-info">No results found</div>';
+                    return;
+                }
+                
+                results.forEach(item => {
+                    const resultDiv = document.createElement('div');
+                    resultDiv.className = 'result-item';
+                    
+                    const fileName = document.createElement('div');
+                    fileName.className = 'file-name';
+                    fileName.textContent = item.file_name || 'Unknown file';
+                    
+                    const content = document.createElement('div');
+                    content.className = 'content';
+                    content.textContent = item.content;
+                    
+                    resultDiv.appendChild(fileName);
+                    resultDiv.appendChild(content);
+                    container.appendChild(resultDiv);
+                });
+            }
+
+            Object.keys(forms).forEach(operation => {
+                forms[operation].addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(forms[operation]);
+                    formData.append('operation', operation);
+                    
+                    const originalText = showLoading(buttons[operation]);
+
+                    try {
+                        const response = await fetch('/api/process', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const data = await response.json();
+                        hideLoading(buttons[operation], originalText);
+
+                        if (data.status === 'success') {
+                            const resultDiv = document.getElementById(`${operation}Result`);
+                            resultDiv.classList.remove('hidden');
+                            
+                            if (operation === 'search') {
+                                displaySearchResults(data.result);
+                            } else {
+                                const resultContent = document.getElementById(
+                                    operation === 'extract' ? 'extractedText' : 'summaryText'
+                                );
+                                resultContent.textContent = data.result;
+                            }
+                        } else {
+                            alert(data.error || 'An error occurred');
+                        }
+                    } catch (error) {
+                        hideLoading(buttons[operation], originalText);
+                        alert('An error occurred while processing your request');
+                        console.error(error);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html> 
